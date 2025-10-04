@@ -39,7 +39,7 @@ class SyncDataBase extends Command
      */
     public function handle(): void
     {
-        set_time_limit(3600);
+        set_time_limit(36000);
         ini_set('memory_limit', '512M');
 
         $this->info("Sync data from wb-api started...");

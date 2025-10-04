@@ -5,8 +5,6 @@ services:
             dockerfile: Dockerfile
         container_name: backend
         restart: unless-stopped
-        depends_on:
-          - db
         volumes:
           - .:/var/www
         networks:
@@ -26,25 +24,7 @@ services:
         depends_on:
           - backend
 
-    db:
-        image: mysql:9.4
-        container_name: db
-        restart: unless-stopped
-        environment:
-            MYSQL_ROOT_PASSWORD: root
-            MYSQL_DATABASE: analytics
-            MYSQL_USER: analytic
-            MYSQL_PASSWORD: analytic12345678
-        ports:
-            - "3306:3306"
-        volumes:
-            - ./mysql:/var/lib/mysql
-        networks:
-            - app-network
 
 networks:
     app-network:
         driver: bridge
-
-volumes:
-    mysql:
