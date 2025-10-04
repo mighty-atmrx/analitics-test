@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Dto;
 
-use DateTimeImmutable;
+use App\Enum\SyncEndpointEnum;
 use Exception;
 
 class IncomeDto implements BaseDto
@@ -46,18 +48,18 @@ class IncomeDto implements BaseDto
     public static function fromArray(array $item): BaseDto
     {
         return new self(
-            income_id: (int) ($item['income_id'] ?? 0),
+            income_id: (int)($item['income_id'] ?? 0),
             number: !empty($item['number']) ? (string)$item['number'] : null,
-            date: (string) ($item['date'] ?? ''),
-            last_change_date: (string) ($item['last_change_date'] ?? ''),
-            supplier_article: (string) ($item['supplier_article'] ?? ''),
-            tech_size: (string) ($item['tech_size'] ?? ''),
-            barcode: (int) ($item['barcode'] ?? 0),
-            quantity: (int) ($item['quantity'] ?? 0),
-            total_price: (float) ($item['total_price'] ?? 0),
-            date_close: (string) ($item['date_close'] ?? ''),
-            warehouse_name: (string) ($item['warehouse_name'] ?? ''),
-            nm_id: (int) ($item['nm_id'] ?? 0),
+            date: (string)($item['date'] ?? ''),
+            last_change_date: (string)($item['last_change_date'] ?? ''),
+            supplier_article: (string)($item['supplier_article'] ?? ''),
+            tech_size: (string)($item['tech_size'] ?? ''),
+            barcode: (int)($item['barcode'] ?? 0),
+            quantity: (int)($item['quantity'] ?? 0),
+            total_price: (float)($item['total_price'] ?? 0),
+            date_close: (string)($item['date_close'] ?? ''),
+            warehouse_name: (string)($item['warehouse_name'] ?? ''),
+            nm_id: (int)($item['nm_id'] ?? 0),
         );
     }
 }

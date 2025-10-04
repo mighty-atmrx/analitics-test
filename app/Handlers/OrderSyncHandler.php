@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Handlers;
 
 use App\Dto\BaseDto;
-use App\Dto\OrderDto;
+use App\Enum\SyncEndpointEnum;
 
 class OrderSyncHandler implements BaseHandler
 {
@@ -16,5 +18,10 @@ class OrderSyncHandler implements BaseHandler
     public function getValues(BaseDto $dto): array
     {
         return $dto->toArray();
+    }
+
+    public function supports(SyncEndpointEnum $endpoint): bool
+    {
+        return $endpoint === SyncEndpointEnum::ORDERS;
     }
 }

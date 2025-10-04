@@ -1,30 +1,37 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Services;
 
 use App\Dto\BaseDto;
+use App\Enum\SyncEndpointEnum;
 use App\Handlers\BaseHandler;
-use App\Handlers\OrderSyncHandler;
-use App\Handlers\SaleSyncHandler;
-use App\Handlers\StockSyncHandler;
-use App\Handlers\IncomeSyncHandler;
+use App\Http\Exceptions\DtoNotFoundException;
+use App\Http\Exceptions\HandlerNotFoundException;
 use Exception;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Psr\Log\LoggerInterface;
 
-class SyncService
+readonly class SyncService
 {
-    private ApiClientService $apiClient;
+    /**
+     * @param BaseHandler[] $handlers
+     */
     public function __construct(
+        private ApiClientService $apiClient,
+        private LoggerInterface $logger,
+        private iterable $handlers,
     ) {
-        $this->apiClient = new ApiClientService();
     }
 
     /**
+     * @throws ModelNotFoundException
      * @throws Exception
      * */
-    public function sync(string $endpoint): void
+    public function sync(SyncEndpointEnum $endpoint): void
     {
-        $handler = $this->makeHandler($endpoint);
+        $handler = $this->getHandler($endpoint);
 
         /** @var class-string<BaseDto> $dtoClass */
         $dtoClass = $this->makeDto($endpoint);
@@ -34,32 +41,33 @@ class SyncService
         }
 
         $items = $this->apiClient->fetchData($endpoint);
-
-        Log::info("SyncService: endpoint={$endpoint}, fetched " . count($items) . " items total");
-
         if (empty($items)) {
-            Log::warning("SyncService: no items fetched for endpoint={$endpoint}");
+            $this->logger->warning("SyncService: no items fetched for endpoint={$endpoint->value}");
             return;
         }
 
+        $this->logger->info("SyncService: endpoint={$endpoint->value}, fetched " . count($items) . " items total");
+
         $model = $handler->getModelClass();
         if (!class_exists($model)) {
-            throw new Exception("Model class {$model} does not exist");
+            throw new ModelNotFoundException("Model class {$model} does not exist");
         }
+
+        $model::truncate();
 
         $chunkSize = 1000;
         $chunks = array_chunk($items, $chunkSize);
 
         foreach ($chunks as $chunkIndex => $chunk) {
-            Log::info("Processing chunk {$chunkIndex} of " . count($chunks) . " for {$endpoint}");
+            $this->logger->info("Processing chunk {$chunkIndex} of " . count($chunks) . " for {$endpoint->value}");
 
             foreach ($chunk as $itemIndex => $item) {
                 try {
                     $dto = $dtoClass::fromArray($item);
                     $model::create($handler->getValues($dto));
                 } catch (\Throwable $e) {
-                    Log::error("Error processing item {$chunkIndex}-{$itemIndex}: " . $e->getMessage());
-                    Log::debug("Problematic item data: " . json_encode($item, JSON_UNESCAPED_UNICODE));
+                    $this->logger->error("Error processing item {$chunkIndex}-{$itemIndex}: " . $e->getMessage());
+                    $this->logger->debug("Problematic item data: " . json_encode($item, JSON_UNESCAPED_UNICODE));
                     continue;
                 }
             }
@@ -68,35 +76,35 @@ class SyncService
                 gc_collect_cycles();
             }
 
-            Log::info("Memory usage: " . round(memory_get_usage(true) / 1024 / 1024, 2) . "MB");
+            $this->logger->info("Memory usage: " . round(memory_get_usage(true) / 1024 / 1024, 2) . "MB");
         }
     }
 
     /**
-     * @throws Exception
+     * @throws HandlerNotFoundException
      */
-    private function makeHandler(string $endpoint): BaseHandler
+    private function getHandler(SyncEndpointEnum $endpoint): BaseHandler
     {
-        return match($endpoint) {
-            'orders' => app(OrderSyncHandler::class),
-            'sales'  => app(SaleSyncHandler::class),
-            'incomes'=> app(IncomeSyncHandler::class),
-            'stocks' => app(StockSyncHandler::class),
-            default  => throw new \Exception("No handler for {$endpoint}")
-        };
+        foreach ($this->handlers as $handler) {
+            if ($handler->supports($endpoint)) {
+                return $handler;
+            }
+        }
+
+        throw new HandlerNotFoundException($endpoint->value);
     }
 
     /**
-     * @throws Exception
+     * @throws DtoNotFoundException
      */
-    private function makeDto(string $endpoint): string
+    private function makeDto(SyncEndpointEnum $endpoint): string
     {
         return match($endpoint) {
-            'orders' => \App\Dto\OrderDto::class,
-            'sales'  => \App\Dto\SaleDto::class,
-            'incomes'=> \App\Dto\IncomeDto::class,
-            'stocks' => \App\Dto\StockDto::class,
-            default  => throw new \Exception("No DTO for {$endpoint}")
+            SyncEndpointEnum::ORDERS => \App\Dto\OrderDto::class,
+            SyncEndpointEnum::SALES => \App\Dto\SaleDto::class,
+            SyncEndpointEnum::INCOMES => \App\Dto\IncomeDto::class,
+            SyncEndpointEnum::STOCKS => \App\Dto\StockDto::class,
+            default => throw new DtoNotFoundException("Dto not found for endpoint {$endpoint->value}"),
         };
     }
 }

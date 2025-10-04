@@ -1,18 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Services;
 
+use App\Enum\SyncEndpointEnum;
 use Exception;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 
 class ApiClientService
 {
     private string $token;
     private string $baseUrl;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly LoggerInterface $logger,
+    ) {
         $this->baseUrl = config('wb.url');
         $this->token = config('wb.key');
     }
@@ -20,12 +24,12 @@ class ApiClientService
     /**
      * @throws Exception
      */
-    public function get(string $endpoint, array $params = []): array
+    public function get(SyncEndpointEnum $endpoint, array $params = []): array
     {
         $params['key'] = $this->token;
-        $url = "{$this->baseUrl}/api/{$endpoint}";
+        $url = "{$this->baseUrl}/api/{$endpoint->value}";
 
-        Log::info("Fetching: {$url}?" . http_build_query($params));
+        $this->logger->info("Fetching: {$url}?" . http_build_query($params));
 
         try {
             $response = Http::withOptions([
@@ -36,28 +40,27 @@ class ApiClientService
                 ->retry(3, 2000)
                 ->get($url, $params);
 
-            Log::info("Response status: " . $response->status());
-
+            $this->logger->info("Response status: " . $response->status());
         } catch (Exception $e) {
-            Log::error("Http request failed: " . $e->getMessage());
+            $this->logger->error("Http request failed: " . $e->getMessage());
             throw new Exception("Http get error: " . $e->getMessage());
         }
 
         if ($response->failed()) {
-            Log::error("API error (failed response): " . $response->body());
+            $this->logger->error("API error (failed response): " . $response->body());
             throw new Exception("API error: " . $response->body());
         }
 
         $decoded = json_decode($response->body(), true, 512, JSON_BIGINT_AS_STRING);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            Log::error("JSON decode error on {$url}: " . json_last_error_msg());
-            Log::error("Raw response: " . $response->body());
+            $this->logger->error("JSON decode error on {$url}: " . json_last_error_msg());
+            $this->logger->error("Raw response: " . $response->body());
             throw new Exception("JSON decode error: " . json_last_error_msg());
         }
 
         if (!is_array($decoded)) {
-            Log::error("Unexpected response format: " . $response->body());
+            $this->logger->error("Unexpected response format: " . $response->body());
             throw new Exception("Unexpected response format from API");
         }
 
@@ -67,7 +70,7 @@ class ApiClientService
     /**
      * @throws Exception
      */
-    public function fetchData(string $endpoint): array
+    public function fetchData(SyncEndpointEnum $endpoint): array
     {
         $all = [];
         $page = 1;
@@ -79,9 +82,12 @@ class ApiClientService
         $consecutiveErrors = 0;
         $maxConsecutiveErrors = 3;
 
+        $count = 0;
+        $lastPage = 0;
+
         do {
             try {
-                Log::info("Fetching page {$page} for {$endpoint}");
+                $this->logger->info("Fetching page {$page} for {$endpoint->value}");
 
                 $response = $this->get($endpoint, [
                     'dateFrom' => $from,
@@ -96,15 +102,15 @@ class ApiClientService
                 $lastPage = $response['meta']['last_page'];
 
                 if ($count === 0) {
-                    Log::info("API returned empty page {$page}, stopping");
+                    $this->logger->info("API returned empty page {$page}, stopping");
                     break;
                 }
 
                 $all = array_merge($all, $items);
-                Log::info("Loaded page {$page}, items: {$count}, total: " . count($all));
+                $this->logger->info("Loaded page {$page}, items: {$count}, total: " . count($all));
 
                 if ($page === $lastPage) {
-                    Log::info("Reached last page {$page}" .
+                    $this->logger->info("Reached last page {$page}" .
                         ($lastPage ? " (of {$lastPage})" : ""));
                     break;
                 }
@@ -115,11 +121,11 @@ class ApiClientService
                 usleep(500_000);
 
             } catch (\Throwable $e) {
-                Log::error("Error fetching page {$page}: " . $e->getMessage());
+                $this->logger->error("Error fetching page {$page}: " . $e->getMessage());
                 $consecutiveErrors++;
 
                 if ($consecutiveErrors >= $maxConsecutiveErrors) {
-                    Log::error("Too many consecutive errors ({$consecutiveErrors}), stopping");
+                    $this->logger->error("Too many consecutive errors ({$consecutiveErrors}), stopping");
                     break;
                 }
 
@@ -129,15 +135,15 @@ class ApiClientService
 
         } while ($count === $limit && $page <= $lastPage);
 
-        Log::info("Finished fetching {$endpoint}. Total pages: {$page}, total items: " . count($all));
+        $this->logger->info("Finished fetching {$endpoint->value}. Total pages: {$page}, total items: " . count($all));
         return $all;
     }
 
-    private function getDateParamsForEndpoint(string $endpoint): array
+    private function getDateParamsForEndpoint(SyncEndpointEnum $endpoint): array
     {
         $today = date('Y-m-d');
 
-        if ($endpoint === 'stocks') {
+        if ($endpoint->value === 'stocks') {
             return [
                 'from' => $today,
                 'to' => $today

@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands;
 
+use App\Enum\SyncEndpointEnum;
 use App\Http\Services\SyncService;
 use Exception;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 
 class SyncDataBase extends Command
 {
@@ -24,7 +27,8 @@ class SyncDataBase extends Command
     protected $description = 'Command for import data from wb-api';
 
     public function __construct(
-        private readonly SyncService $syncService
+        private readonly SyncService $syncService,
+        private readonly LoggerInterface $logger
     ){
         parent::__construct();
     }
@@ -42,25 +46,25 @@ class SyncDataBase extends Command
         $progressBar = $this->output->createProgressBar(4);
         $progressBar->setFormat('debug');
         $progressBar->start();
+
         try {
             $this->info("\nSyncing orders...");
-            $this->syncService->sync('orders');
+            $this->syncService->sync(SyncEndpointEnum::ORDERS);
             $progressBar->advance();
 
             $this->info("\nSyncing sales...");
-            $this->syncService->sync('sales');
+            $this->syncService->sync(SyncEndpointEnum::SALES);
             $progressBar->advance();
 
             $this->info("\nSyncing incomes...");
-            $this->syncService->sync('incomes');
+            $this->syncService->sync(SyncEndpointEnum::INCOMES);
             $progressBar->advance();
 
             $this->info("\nSyncing stocks...");
-            $this->syncService->sync('stocks');
+            $this->syncService->sync(SyncEndpointEnum::STOCKS);
             $progressBar->advance();
-
         } catch (Exception $e) {
-            Log::error($e->getMessage());
+            $this->logger->error($e->getMessage());
         }
 
 
