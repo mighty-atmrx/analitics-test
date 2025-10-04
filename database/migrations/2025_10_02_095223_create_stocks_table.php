@@ -33,6 +33,11 @@ return new class extends Migration
             $table->decimal('price', 10, 2)->nullable();
             $table->decimal('discount', 5, 2)->nullable();
             $table->timestamps();
+
+            $table->index([
+                'barcode',
+                'warehouse_name',
+            ], 'stocks_composite_index');
         });
     }
 

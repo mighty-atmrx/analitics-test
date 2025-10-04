@@ -6,7 +6,6 @@ use App\Http\Services\SyncService;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Psr\Log\LoggerInterface;
 
 class SyncDataBase extends Command
 {
@@ -44,19 +43,19 @@ class SyncDataBase extends Command
         $progressBar->setFormat('debug');
         $progressBar->start();
         try {
-            $progressBar->setMessage("Syncing orders...");// $this->info вместо $progressBar->setMessage
+            $this->info("\nSyncing orders...");
             $this->syncService->sync('orders');
             $progressBar->advance();
 
-            $progressBar->setMessage("Syncing sales...");
+            $this->info("\nSyncing sales...");
             $this->syncService->sync('sales');
             $progressBar->advance();
 
-            $progressBar->setMessage("Syncing incomes...");
+            $this->info("\nSyncing incomes...");
             $this->syncService->sync('incomes');
             $progressBar->advance();
 
-            $progressBar->setMessage("Syncing stocks...");
+            $this->info("\nSyncing stocks...");
             $this->syncService->sync('stocks');
             $progressBar->advance();
 

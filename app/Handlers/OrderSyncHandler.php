@@ -13,14 +13,6 @@ class OrderSyncHandler implements BaseHandler
         return \App\Models\Order::class;
     }
 
-    /** @var OrderDto $dto */
-    public function getUniqueBy(BaseDto $dto): array
-    {
-        return [
-            'odid' => $dto->odid,
-        ];
-    }
-
     public function getValues(BaseDto $dto): array
     {
         return $dto->toArray();

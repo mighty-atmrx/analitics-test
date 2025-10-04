@@ -26,6 +26,10 @@ return new class extends Migration
             $table->string('warehouse_name');
             $table->bigInteger('nm_id');
             $table->timestamps();
+
+            $table->index([
+                'income_id',
+            ], 'incomes_composite_index');
         });
     }
 

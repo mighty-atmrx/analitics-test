@@ -32,6 +32,15 @@ return new class extends Migration
             $table->boolean('is_cancel')->default(false);
             $table->date('cancel_dt')->nullable();
             $table->timestamps();
+
+
+            $table->index([
+                'g_number',
+                'date',
+                'barcode',
+                'nm_id',
+                'warehouse_name'
+            ], 'orders_composite_index');
         });
     }
 

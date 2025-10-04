@@ -30,10 +30,10 @@ class ApiClientService
         try {
             $response = Http::withOptions([
                 'decode_content' => false,
-                'timeout' => 30, // увеличиваем таймаут
+                'timeout' => 30,
             ])
                 ->timeout(30)
-                ->retry(3, 2000) // увеличиваем паузу между ретраями
+                ->retry(3, 2000)
                 ->get($url, $params);
 
             Log::info("Response status: " . $response->status());
@@ -72,9 +72,10 @@ class ApiClientService
         $all = [];
         $page = 1;
         $limit = 500;
-        $from = '2000-01-01';
-        $to = (new \DateTimeImmutable())->format('Y-m-d');
-        $maxPages = 1500;
+        $dateParams = $this->getDateParamsForEndpoint($endpoint);
+        $from = $dateParams['from'];
+        $to = $dateParams['to'];
+
         $consecutiveErrors = 0;
         $maxConsecutiveErrors = 3;
 
@@ -92,6 +93,8 @@ class ApiClientService
                 $items = $response['data'] ?? [];
                 $count = count($items);
 
+                $lastPage = $response['meta']['last_page'];
+
                 if ($count === 0) {
                     Log::info("API returned empty page {$page}, stopping");
                     break;
@@ -99,6 +102,12 @@ class ApiClientService
 
                 $all = array_merge($all, $items);
                 Log::info("Loaded page {$page}, items: {$count}, total: " . count($all));
+
+                if ($page === $lastPage) {
+                    Log::info("Reached last page {$page}" .
+                        ($lastPage ? " (of {$lastPage})" : ""));
+                    break;
+                }
 
                 $page++;
                 $consecutiveErrors = 0;
@@ -118,9 +127,26 @@ class ApiClientService
                 continue;
             }
 
-        } while ($count === $limit && $page <= $maxPages);
+        } while ($count === $limit && $page <= $lastPage);
 
         Log::info("Finished fetching {$endpoint}. Total pages: {$page}, total items: " . count($all));
         return $all;
+    }
+
+    private function getDateParamsForEndpoint(string $endpoint): array
+    {
+        $today = date('Y-m-d');
+
+        if ($endpoint === 'stocks') {
+            return [
+                'from' => $today,
+                'to' => $today
+            ];
+        }
+
+        return [
+            'from' => '2000-01-01',
+            'to' => $today
+        ];
     }
 }

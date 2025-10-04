@@ -41,6 +41,10 @@ return new class extends Migration
             $table->string('brand');
             $table->boolean('is_storno')->nullable();
             $table->timestamps();
+
+            $table->index([
+                'sale_id'
+            ], 'sales_composite_index');
         });
     }
 

@@ -47,8 +47,6 @@ class SyncService
             throw new Exception("Model class {$model} does not exist");
         }
 
-        $successCount = 0;
-        $errorCount = 0;
         $chunkSize = 1000;
         $chunks = array_chunk($items, $chunkSize);
 
@@ -58,14 +56,8 @@ class SyncService
             foreach ($chunk as $itemIndex => $item) {
                 try {
                     $dto = $dtoClass::fromArray($item);
-                    $model::updateOrCreate(
-                        $handler->getUniqueBy($dto),
-                        $handler->getValues($dto),
-                    );
-
-                    $successCount++;
+                    $model::create($handler->getValues($dto));
                 } catch (\Throwable $e) {
-                    $errorCount++;
                     Log::error("Error processing item {$chunkIndex}-{$itemIndex}: " . $e->getMessage());
                     Log::debug("Problematic item data: " . json_encode($item, JSON_UNESCAPED_UNICODE));
                     continue;

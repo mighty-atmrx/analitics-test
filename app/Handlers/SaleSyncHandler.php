@@ -13,14 +13,6 @@ class SaleSyncHandler implements BaseHandler
         return \App\Models\Sale::class;
     }
 
-    /** @var SaleDto $dto */
-    public function getUniqueBy(BaseDto $dto): array
-    {
-        return [
-            'sale_id' => $dto->sale_id,
-        ];
-    }
-
     public function getValues(BaseDto $dto): array
     {
         return $dto->toArray();
