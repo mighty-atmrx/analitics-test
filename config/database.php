@@ -58,9 +58,17 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::ATTR_TIMEOUT => 300, // 5 минут таймаут
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
             ]) : [],
+
+            'timeout' => 300, // 5 минут
+            'read_timeout' => 300,
+            'write_timeout' => 300,
         ],
 
         'mariadb' => [
