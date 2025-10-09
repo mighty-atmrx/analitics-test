@@ -6,8 +6,10 @@ namespace App\Http\Services;
 
 use App\Enum\SyncEndpointEnum;
 use Exception;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\Response;
 
 class ApiClientService
 {
@@ -32,13 +34,11 @@ class ApiClientService
         $this->logger->info("Fetching: {$url}?" . http_build_query($params));
 
         try {
-            $response = Http::withOptions([
-                'decode_content' => false,
-                'timeout' => 30,
-            ])
-                ->timeout(30)
-                ->retry(3, 2000)
-                ->get($url, $params);
+            $response = $this->createHttpClient()->get($url, $params);
+
+            if ($response->status() === Response::HTTP_TOO_MANY_REQUESTS) {
+                $response = $this->handleTooManyRequests($response, $url, $params);
+            }
 
             $this->logger->info("Response status: " . $response->status());
         } catch (Exception $e) {
@@ -47,10 +47,58 @@ class ApiClientService
         }
 
         if ($response->failed()) {
-            $this->logger->error("API error (failed response): " . $response->body());
-            throw new Exception("API error: " . $response->body());
+            $this->handlerFailedResponse($response, $url);
         }
 
+        return $this->decodeResponse($response, $url);
+    }
+
+    private function createHttpClient(): PendingRequest
+    {
+        return Http::withOptions([
+            'decode_content' => false,
+            'timeout' => 30,
+        ])
+            ->timeout(30)
+            ->retry(3, 2000, function ($exception) {
+                return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+            });
+    }
+
+    /**
+     * @throws Exception
+     */
+    private function handlerFailedResponse(\Illuminate\Http\Client\Response $response, string $url): void
+    {
+        $status = $response->status();
+        $body = $response->body();
+
+        if ($status === Response::HTTP_FORBIDDEN) {
+            throw new Exception("Access forbidden for {$url}. Check API key.");
+        } else if ($status === Response::HTTP_INTERNAL_SERVER_ERROR) {
+            throw new Exception("Server error ({$status}) for url {$url}");
+        } else {
+            throw new Exception("API error ({$status}) for url {$url}. Body: {$body}");
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    private function handleTooManyRequests(\Illuminate\Http\Client\Response $response, string $url, array $params): \Illuminate\Http\Client\Response
+    {
+        $retryAfter = $response->header('Retry-After') ?? 60;
+        $this->logger->warning("Too many requests, retrying after {$retryAfter} seconds");
+        sleep($retryAfter);
+
+        return $this->createHttpClient()->get($url, $params);
+    }
+
+    /**
+     * @throws Exception
+     */
+    private function decodeResponse(\Illuminate\Http\Client\Response $response, string $url): array
+    {
         $decoded = json_decode($response->body(), true, 512, JSON_BIGINT_AS_STRING);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
@@ -76,8 +124,6 @@ class ApiClientService
         $page = 1;
         $limit = 500;
         $dateParams = $this->getDateParamsForEndpoint($endpoint);
-        $from = $dateParams['from'];
-        $to = $dateParams['to'];
 
         $consecutiveErrors = 0;
         $maxConsecutiveErrors = 3;
@@ -90,15 +136,14 @@ class ApiClientService
                 $this->logger->info("Fetching page {$page} for {$endpoint->value}");
 
                 $response = $this->get($endpoint, [
-                    'dateFrom' => $from,
-                    'dateTo'   => $to,
+                    'dateFrom' => $dateParams['from'],
+                    'dateTo'   => $dateParams['to'],
                     'page'     => $page,
                     'limit'    => $limit,
                 ]);
 
                 $items = $response['data'] ?? [];
                 $count = count($items);
-
                 $lastPage = $response['meta']['last_page'];
 
                 if ($count === 0) {

@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libzip-dev \
+    supervisor \
+    cron \
     && docker-php-ext-configure zip \
     && docker-php-ext-install -j$(nproc) zip mbstring pdo pdo_mysql \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -22,8 +24,15 @@ RUN composer install --no-scripts --no-interaction
 
 COPY . .
 
-RUN chown -R www-data:www-data /var/www & chmod -R 755 /var/www
+RUN chown -R www-data:www-data /var/www && chmod -R 755 /var/www
+
+COPY docker/supervisord.conf /etc/supervisord.conf
+
+COPY docker/laravel.cron /etc/cron.d/laravel
+
+RUN chmod 0644 /etc/cron.d/laravel \
+    && crontab /etc/cron.d/laravel
 
 EXPOSE 9000
 
-CMD ["php-fpm"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

@@ -1,12 +1,12 @@
 services:
-    backend:
+    php:
         build:
             context: .
             dockerfile: Dockerfile
-        container_name: backend
+        container_name: php
         restart: unless-stopped
         depends_on:
-          - db
+          - mysql
         volumes:
           - .:/var/www
         networks:
@@ -24,11 +24,11 @@ services:
         networks:
           - app-network
         depends_on:
-          - backend
+          - php
 
-    db:
+    mysql:
       image: mysql:9.4
-      container_name: db
+      container_name: mysql
       restart: unless-stopped
       environment:
         MYSQL_ROOT_PASSWORD: root
@@ -36,7 +36,7 @@ services:
         MYSQL_USER: analytic
         MYSQL_PASSWORD: analytic12345678
       ports:
-        - "3306:3306"
+        - "3307:3306"
       volumes:
         - ./mysql:/var/lib/mysql
       networks:
