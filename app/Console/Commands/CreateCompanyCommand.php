@@ -6,10 +6,8 @@ namespace App\Console\Commands;
 
 use App\Http\Exceptions\CompanyNameIsTakenException;
 use App\Http\Services\CompanyService;
-use Illuminate\Console\Command;
-use Symfony\Component\Console\Command\Command as CommandAlias;
 
-class CreateCompanyCommand extends Command
+class CreateCompanyCommand extends BaseCreateCommand
 {
     /**
      * The name and signature of the console command.
@@ -31,17 +29,27 @@ class CreateCompanyCommand extends Command
         parent::__construct();
     }
 
-    /**
-     * @throws CompanyNameIsTakenException
-     */
-    public function handle(): int
+    protected function getService(): CompanyService
     {
-        $name = $this->argument('name');
+        return $this->companyService;
+    }
 
-        $company = $this->companyService->create($name);
+    protected function getCreationData(): array
+    {
+        return [
+            'name' => (string)$this->argument('name')
+        ];
+    }
 
-        $this->info("Company was created successfully! ID: {$company->id}, Name: {$company->name}");
+    protected function getEntityType(): string
+    {
+        return 'Company';
+    }
 
-        return CommandAlias::SUCCESS;
+    protected function getSpecificExceptions(): array
+    {
+        return [
+            CompanyNameIsTakenException::class,
+        ];
     }
 }

@@ -32,6 +32,8 @@ return new class extends Migration
             $table->integer('sc_code')->nullable();
             $table->decimal('price', 10, 2)->nullable();
             $table->decimal('discount', 5, 2)->nullable();
+
+            $table->date('sync_date');
             $table->timestamps();
 
             $table->index([

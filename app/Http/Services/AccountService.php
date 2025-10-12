@@ -4,26 +4,23 @@ declare(strict_types=1);
 
 namespace App\Http\Services;
 
-use App\Dto\AccountDto;
 use App\Http\Exceptions\AccountAlreadyExistsException;
 use App\Repositories\AccountRepository;
 
-readonly class AccountService
+class AccountService extends BaseCreateService
 {
     public function __construct(
-        private AccountRepository $repository
+        private readonly AccountRepository $repository
     ){
     }
 
-    /**
-     * @throws AccountAlreadyExistsException
-     */
-    public function create(array $data): AccountDto
+    protected function getRepository(): AccountRepository
     {
-        if ($this->repository->exists($data)) {
-            throw new AccountAlreadyExistsException();
-        }
+        return $this->repository;
+    }
 
-        return $this->repository->create($data);
+    protected function getExistsExceptionClass(): string
+    {
+        return AccountAlreadyExistsException::class;
     }
 }

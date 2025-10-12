@@ -8,13 +8,11 @@ use App\Http\Exceptions\LoginPasswordRequiredException;
 use App\Http\Exceptions\ServiceNotSupportTokenException;
 use App\Http\Requests\Token\StoreRequest;
 use App\Http\Services\TokenService;
-use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Random\RandomException;
-use Symfony\Component\Console\Command\Command as CommandAlias;
 
-class CreateTokenCommand extends Command
+class CreateTokenCommand extends BaseCreateCommand
 {
     /**
      * The name and signature of the console command.
@@ -41,35 +39,47 @@ class CreateTokenCommand extends Command
         parent::__construct();
     }
 
-    /**
-     * @throws ServiceNotSupportTokenException
-     * @throws RandomException
-     * @throws ValidationException
-     * @throws LoginPasswordRequiredException
-     */
-    public function handle(): int
+    protected function getService(): TokenService
     {
-        $data = [
-            'account_id' => $this->argument('account_id'),
-            'api_service_id' => $this->argument('api_service_id'),
-            'token_type_id' => $this->argument('token_type_id'),
-            'login' => $this->argument('login'),
-            'password' => $this->argument('password'),
-        ];
+        return $this->service;
+    }
 
+    protected function getCreationData(): array
+    {
+        return [
+            'account_id' => (int) $this->argument('account_id'),
+            'api_service_id' => (int) $this->argument('api_service_id'),
+            'token_type_id' => (int) $this->argument('token_type_id'),
+            'login' => (string) $this->argument('login'),
+            'password' => (string) $this->argument('password'),
+        ];
+    }
+
+    protected function getEntityType(): string
+    {
+        return 'Token';
+    }
+
+    protected function getSpecificExceptions(): array
+    {
+        return [
+            ServiceNotSupportTokenException::class,
+            RandomException::class,
+            ValidationException::class,
+            LoginPasswordRequiredException::class
+        ];
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    protected function validateData(array $data): void
+    {
         $rules = (new StoreRequest())->rules();
         $validator = Validator::make($data, $rules);
+
         if ($validator->fails()) {
-            $this->error(json_encode($validator->errors()->all()));
-            return CommandAlias::FAILURE;
+            throw new ValidationException($validator);
         }
-
-        $validated = $validator->validated();
-
-        $this->service->create($validated);
-
-        $this->info("Токен успешно создан!");
-
-        return CommandAlias::SUCCESS;
     }
 }

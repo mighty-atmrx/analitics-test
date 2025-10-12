@@ -17,4 +17,24 @@ class Account extends Model
     {
         return $this->hasMany(Token::class);
     }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function incomes(): HasMany
+    {
+        return $this->hasMany(Income::class);
+    }
+
+    public function sales(): HasMany
+    {
+        return $this->hasMany(Sale::class);
+    }
+
+    public function stocks(): HasMany
+    {
+        return $this->hasMany(Stock::class);
+    }
 }

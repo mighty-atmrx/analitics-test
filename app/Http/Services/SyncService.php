@@ -14,6 +14,7 @@ use App\Http\Exceptions\HandlerNotFoundException;
 use App\Models\Account;
 use App\Repositories\AccountRepository;
 use Exception;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class SyncService
@@ -24,7 +25,7 @@ class SyncService
      * @param BaseHandler[] $handlers
      */
     public function __construct(
-        private readonly ApiClientService $apiClient,
+        private readonly PaginatedDataFetcher $dataFetcher,
         private readonly DebugService $debugService,
         private readonly iterable $handlers,
         private readonly AccountRepository $accountRepository
@@ -46,20 +47,19 @@ class SyncService
             gc_collect_cycles();
         }
 
-        $items = $this->apiClient->fetchData($endpoint);
+        /** @var class-string<Model> $model */
+        $model = $handler->getModelClass();
+        if (!class_exists($model)) {
+            throw new ModelNotFoundException("Model class {$model} does not exist");
+        }
+
+        $items = $this->dataFetcher->fetchData($endpoint, $model, $this->account);
         if (empty($items)) {
             $this->debugService->warning("SyncService: no items fetched for endpoint={$endpoint->value}");
             return;
         }
 
         $this->debugService->info("SyncService: endpoint={$endpoint->value}, fetched " . count($items) . " items total");
-
-        $model = $handler->getModelClass();
-        if (!class_exists($model)) {
-            throw new ModelNotFoundException("Model class {$model} does not exist");
-        }
-
-        $model::truncate();
 
         $chunkSize = 1000;
         $chunks = array_chunk($items, $chunkSize);
@@ -69,6 +69,8 @@ class SyncService
 
             foreach ($chunk as $itemIndex => $item) {
                 try {
+                    $item['account_id'] = $this->account['id'];
+                    $item['sync_date'] = today()->toDateTimeString();
                     $dto = $dtoClass::fromArray($item);
                     $model::create($handler->getValues($dto));
                 } catch (\Throwable $e) {

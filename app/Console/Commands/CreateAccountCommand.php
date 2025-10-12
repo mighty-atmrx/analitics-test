@@ -6,10 +6,9 @@ namespace App\Console\Commands;
 
 use App\Http\Exceptions\AccountAlreadyExistsException;
 use App\Http\Services\AccountService;
-use Illuminate\Console\Command;
-use Symfony\Component\Console\Command\Command as CommandAlias;
+use InvalidArgumentException;
 
-class CreateAccountCommand extends Command
+class CreateAccountCommand extends BaseCreateCommand
 {
     /**
      * The name and signature of the console command.
@@ -34,19 +33,30 @@ class CreateAccountCommand extends Command
         parent::__construct();
     }
 
-    /**
-     * @throws AccountAlreadyExistsException
-     */
-    public function handle(): int
+    protected function getService(): AccountService
     {
-        $account = $this->service->create([
-            'company_id' => $this->argument('company_id'),
-            'name' => $this->argument('name'),
-            'description' => $this->argument('description') ?? null,
-        ]);
+        return $this->service;
+    }
 
-        $this->info("Account was created successfully! ID: {$account->id}, Name: {$account->name}");
+    protected function getCreationData(): array
+    {
+        return [
+            'company_id' => (int) $this->argument('company_id'),
+            'name' => (string) $this->argument('name'),
+            'description' => (string) $this->argument('description') ?? null,
+        ];
+    }
 
-        return CommandAlias::SUCCESS;
+    protected function getEntityType(): string
+    {
+        return 'Account';
+    }
+
+    protected function getSpecificExceptions(): array
+    {
+        return [
+            AccountAlreadyExistsException::class,
+            InvalidArgumentException::class,
+        ];
     }
 }

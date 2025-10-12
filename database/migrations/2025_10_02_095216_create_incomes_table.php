@@ -25,6 +25,8 @@ return new class extends Migration
             $table->date('date_close');
             $table->string('warehouse_name');
             $table->bigInteger('nm_id');
+
+            $table->date('sync_date');
             $table->timestamps();
 
             $table->index([

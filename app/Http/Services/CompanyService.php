@@ -4,24 +4,36 @@ declare(strict_types=1);
 
 namespace App\Http\Services;
 
-use App\Dto\CompanyDto;
 use App\Http\Exceptions\CompanyNameIsTakenException;
 use App\Repositories\CompanyRepository;
 
-readonly class CompanyService
+class CompanyService extends BaseCreateService
 {
     public function __construct(
-        private CompanyRepository $repository
+        private readonly CompanyRepository $repository
     ){
     }
 
-    /**
-     * @throws CompanyNameIsTakenException
-     */
-    public function create(string $name): CompanyDto
+    protected function getRepository(): CompanyRepository
     {
+        return $this->repository;
+    }
+
+    protected function getExistsExceptionClass(): string
+    {
+        return CompanyNameIsTakenException::class;
+    }
+
+    public function create(array $data)
+    {
+        $name = $data['name'] ?? null;
+        if (!$name) {
+            throw new \InvalidArgumentException('Company name is required');
+        }
+
         if ($this->repository->exists($name)) {
-            throw new CompanyNameIsTakenException();
+            $exceptionClass = $this->getExistsExceptionClass();
+            throw new $exceptionClass();
         }
 
         return $this->repository->create($name);

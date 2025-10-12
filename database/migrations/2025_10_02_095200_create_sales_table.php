@@ -40,6 +40,8 @@ return new class extends Migration
             $table->string('category');
             $table->string('brand');
             $table->boolean('is_storno')->nullable();
+
+            $table->date('sync_date');
             $table->timestamps();
 
             $table->index([

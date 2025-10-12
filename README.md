@@ -6,6 +6,24 @@
 
 Система автоматически выгружает данные по заказам, продажам, поставкам и остаткам из wb-api и сохраняет их в локальную базу данных для последующего анализа.
 
+	•	🐳 Развёртывание через Docker Compose — два сервиса: php и mysql.
+	•	⚙️ Используется нестандартный порт MySQL (3307).
+	•	🕒 Ежедневное обновление данных дважды в день — реализовано через планировщик Laravel Scheduler и команду sync:data.
+	•	🚧 Обработка ошибок Too many requests — встроен retry-механизм с экспоненциальной задержкой.
+	•	🐞 Вывод отладочной информации в консоль — через сервис DebugService и подробные логи.
+	•	🏢 Структура данных в БД:
+	•	Компания (Company)
+	•	Аккаунты компании (Account)
+	•	API сервисы (ApiService)
+	•	Типы токенов (TokenType)
+	•	Токены (Token)
+	•	Связи сервисов и типов токенов (ApiServiceTokenType)
+	•	🔐 Гибкая система токенов — поддержка bearer, api-key, login/password и других типов.
+	•	⚙️ Консольные команды для добавления сущностей:
+	•	make:company, make:account, make:api-service, make:token-type, make:api-service-token-type, make:token.
+	•	👥 Поддержка нескольких аккаунтов — данные разделяются по account_id.
+	•	⏰ Загрузка только свежих данных — по полю date без перезаписи старых записей.
+
 ## ⚠️ Важное примечание о синхронизации данных
 
 **Проблемы с облачными базами данных:**
@@ -29,36 +47,87 @@ dump был сделан 05.10.2025
 
 ```bash
 app/
-├── Console/Commands/SyncDataBase.php # Artisan команда
+app/
+├── Console/
+│   └── Commands/
+│       ├── BaseCreateCommand.php          # Абстрактная команда
+│       ├── CreateCompanyCommand.php       # Создание компании
+│       ├── CreateAccountCommand.php       # Создание аккаунта
+│       ├── CreateTokenTypeCommand.php     # Создание типа токена
+│       ├── CreateApiServiceCommand.php    # Создание API сервиса
+│       ├── CreateApiServiceTokenTypeCommand.php # Связь сервис-токен
+│       ├── CreateTokenCommand.php         # Создание токена
+│       └── SyncDataBase.php               # Синхронизация данных
 ├── Http/
-│   ├── Exceptions/                       # Исключения
+│   ├── Exceptions/                        # Бизнес-исключения
+│   │   ├── AccountAlreadyExistsException.php
+│   │   ├── AccountNotFoundException.php
+│   │   ├── ApiServiceAlreadyExistsException.php
+│   │   ├── ApiServiceTokenTypeAlreadyExistsException.php
+│   │   ├── CompanyNameIsTakenException.php
 │   │   ├── DtoNotFoundException.php
-│   │   └── HandlerNotFoundException.php
-│   │
-│   └── Services/                         # Сервисы
-│       ├── SyncService.php               # Основной сервис синхронизации
-│       └── ApiClientService.php          # Клиент для WB API
-├── Handlers/ # Обработчики для разных типов данных
-│ ├── BaseHandler.php
-│ ├── OrderSyncHandler.php
-│ ├── SaleSyncHandler.php
-│ ├── IncomeSyncHandler.php
-│ └── StockSyncHandler.php
-├── Dto/ # Data Transfer Objects
-│ ├── BaseDto.php
-│ ├── OrderDto.php
-│ ├── SaleDto.php
-│ ├── IncomeDto.php
-│ └── StockDto.php
-├── Enum/
-│ └── SyncEndpointEnum.php # Enum для типов данных
-├── Providers/
-| └── AppServiceProvider.php # Регистрация зависимостей
-└── Models/ 
-  ├── Order.php
-  ├── Sale.php
-  ├── Income.php
-  └── Stock.php
+│   │   ├── HandlerNotFoundException.php
+│   │   ├── LoginPasswordRequiredException.php
+│   │   ├── ServiceNotSupportTokenException.php
+│   │   ├── TokenNotFoundException.php
+│   │   └── TokenTypeAlreadyExistsException.php
+│   ├── Requests/
+│   │   └── Token/
+│   │       └── StoreRequest.php           # Валидация токенов
+│   └── Services/                          # Бизнес-сервисы
+│       ├── BaseCreateService.php          # Базовый CRUD сервис
+│       ├── CompanyService.php             # Управление компаниями
+│       ├── AccountService.php             # Управление аккаунтами
+│       ├── TokenTypeService.php           # Управление типами токенов
+│       ├── ApiServiceManager.php          # Управление API сервисами
+│       ├── TokenService.php               # Управление токенами
+│       ├── SyncService.php                # Основной сервис синхронизации
+│       ├── PaginatedDataFetcher.php       # Пагинация данных
+│       ├── DateStrategyService.php        # Стратегии дат
+│       ├── ApiHttpClientService.php       # HTTP клиент для WB API
+│       └── DebugService.php               # Сервис логирования
+├── Enum/                                  # Перечисления
+│   ├── ApiServiceEnum.php
+│   ├── SyncEndpointEnum.php
+│   └── TokenTypeEnum.php
+├── Dto/                                   # Data Transfer Objects
+│   ├── BaseDto.php
+│   ├── OrderDto.php
+│   ├── SaleDto.php
+│   ├── IncomeDto.php
+│   ├── StockDto.php
+│   ├── AccountDto.php
+│   ├── ApiServiceDto.php
+│   ├── ApiServiceTokenTypeDto.php
+│   ├── CompanyDataDto.php
+│   ├── TokenCreateDto.php
+│   └── TokenTypeDto.php
+├── Models/                                # Eloquent модели
+│   ├── Order.php
+│   ├── Stock.php
+│   ├── Sale.php
+│   ├── Income.php
+│   ├── Account.php
+│   ├── Company.php
+│   ├── ApiService.php
+│   ├── TokenType.php
+│   ├── Token.php
+│   └── ApiServiceTokenType.php
+├── Repositories/                          # Репозитории данных
+│   ├── AccountRepository.php
+│   ├── ApiServiceRepository.php
+│   ├── ApiServiceTokenTypeRepository.php
+│   ├── CompanyRepository.php
+│   ├── TokenRepository.php
+│   └── TokenTypeRepository.php
+├── Handlers/                              # Обработчики синхронизации
+│   ├── BaseHandler.php
+│   ├── OrderSyncHandler.php
+│   ├── SaleSyncHandler.php
+│   ├── IncomeSyncHandler.php
+│   └── StockSyncHandler.php
+└── Providers/
+    └── AppServiceProvider.php             # Регистрация зависимостей
 ```
 
 ## 🛠️ Установка и настройка
@@ -94,9 +163,9 @@ docker-compose up -d --build
 ```
 
 Это запустит:
-•	backend — Laravel PHP контейнер
+•	php — Laravel PHP контейнер
 •	nginx — веб-сервер
-•	db — MySQL база данных
+•	mysql — MySQL база данных
 
 ### 5. Настройка базы данных
 
@@ -125,7 +194,7 @@ docker-compose exec backend php artisan key:generate
 ### 7. Запуск миграций
 
 ```bash
-docker-compose exec backend php artisan migrate
+docker-compose exec php php artisan migrate
 ```
 
 # Импортируйте данные
@@ -133,9 +202,9 @@ docker-compose exec backend php artisan migrate
 В корне проекта есть файл dump.sql с готовыми демо-данными.
 ```bash
 # Скопируйте дамп в контейнер
-docker-compose cp dump.sql db:/dump.sql
+docker-compose cp dump.sql mysql:/dump.sql
 
-docker-compose exec db bash
+docker-compose exec mysql bash
 
 # Импортируйте данные 
 mysql -u root -proot analytics < /dump.sql
@@ -152,10 +221,27 @@ mysql -u root -proot analytics
 
 ## 🚀 Использование команды синхронизации данных
 ```bash
-docker-compose exec backend php artisan sync:data
+docker-compose exec php php artisan sync:data
 ```
 
-Команда последовательно выгружает данные по заказам, продажам, поставкам и остаткам.
+Команда:
+•	подгружает свежие данные по date
+•	учитывает account_id
+•	обрабатывает Too many requests через retry
+•	логирует процесс и память
+
+## 🧩 Консольные команды
+
+| Команда                                                                   | Назначение                              |
+|---------------------------------------------------------------------------|------------------------------------------|
+| `php artisan make:company {name}`                                         | ➕ Добавить новую компанию               |
+| `php artisan make:account {company_id, name}`                             | ➕ Добавить аккаунт                      |
+| `php artisan make:token-type {type, code}`                                | ⚙️ Добавить тип токена                   |
+| `php artisan make:api-service {name, code}`                               | 🌐 Добавить API-сервис                   |
+| `php artisan make:api-service-token-type {api_service_id, token_type_id}` | 🔗 Связать сервис и тип токена           |
+| `php artisan make:token {account_id, api_service_id, token_type_id}`      | 🔑 Добавить токен                        |
+| `php artisan sync:data`                                                   | 🔄 Запустить синхронизацию данных        |
+
 
 ## 🔧 Логирование
 

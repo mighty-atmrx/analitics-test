@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Dto;
 
-use App\Enum\SyncEndpointEnum;
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use Exception;
+use Illuminate\Support\Carbon;
 
 class OrderDto implements BaseDto
 {
     public function __construct(
+        public int $account_id,
         public string $g_number,
         public ?DateTimeImmutable $date,
         public ?DateTimeImmutable $last_change_date,
@@ -29,11 +31,13 @@ class OrderDto implements BaseDto
         public string $brand,
         public bool $is_cancel,
         public ?DateTimeImmutable $cancel_dt,
+        public CarbonImmutable $sync_date
     ){}
 
     public function toArray(): array
     {
         return [
+            'account_id' => $this->account_id,
             'g_number' => $this->g_number,
             'date' => $this->date,
             'last_change_date' => $this->last_change_date,
@@ -52,6 +56,7 @@ class OrderDto implements BaseDto
             'brand' => $this->brand,
             'is_cancel' => $this->is_cancel,
             'cancel_dt' => $this->cancel_dt,
+            'sync_date' => $this->sync_date
         ];
     }
 
@@ -61,6 +66,7 @@ class OrderDto implements BaseDto
     public static function fromArray(array $item): self
     {
         return new self(
+            account_id: (int) $item['account_id'],
             g_number: (string) ($item['g_number'] ?? ''),
             date: !empty($item['date']) ? new DateTimeImmutable($item['date']) : null,
             last_change_date: !empty($item['last_change_date']) ? new DateTimeImmutable($item['last_change_date']) : null,
@@ -79,6 +85,7 @@ class OrderDto implements BaseDto
             brand: (string) ($item['brand'] ?? ''),
             is_cancel: (bool) ($item['is_cancel'] ?? false),
             cancel_dt: !empty($item['cancel_dt']) ? new DateTimeImmutable($item['cancel_dt']) : null,
+            sync_date: Carbon::parse($item['sync_date'])->toImmutable(),
         );
     }
 }

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Dto;
 
-use App\Enum\SyncEndpointEnum;
-use Exception;
+use Carbon\CarbonImmutable;
+use Exception;use Illuminate\Support\Carbon;
 
 class IncomeDto implements BaseDto
 {
     public function __construct(
+        public int $account_id,
         public int $income_id,
         public ?string $number,
         public string $date,
@@ -22,11 +23,13 @@ class IncomeDto implements BaseDto
         public string $date_close,
         public string $warehouse_name,
         public int $nm_id,
+        public CarbonImmutable $sync_date
     ){}
 
     public function toArray(): array
     {
         return [
+            'account_id' => $this->account_id,
             'income_id' => $this->income_id,
             'number' => $this->number,
             'date' => $this->date,
@@ -39,6 +42,7 @@ class IncomeDto implements BaseDto
             'date_close' => $this->date_close,
             'warehouse_name' => $this->warehouse_name,
             'nm_id' => $this->nm_id,
+            'sync_date' => $this->sync_date
         ];
     }
 
@@ -48,6 +52,7 @@ class IncomeDto implements BaseDto
     public static function fromArray(array $item): BaseDto
     {
         return new self(
+            account_id: (int) $item['account_id'],
             income_id: (int)($item['income_id'] ?? 0),
             number: !empty($item['number']) ? (string)$item['number'] : null,
             date: (string)($item['date'] ?? ''),
@@ -60,6 +65,7 @@ class IncomeDto implements BaseDto
             date_close: (string)($item['date_close'] ?? ''),
             warehouse_name: (string)($item['warehouse_name'] ?? ''),
             nm_id: (int)($item['nm_id'] ?? 0),
+            sync_date: Carbon::parse($item['sync_date'])->toImmutable(),
         );
     }
 }

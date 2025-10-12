@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Services;
 
-use App\Enum\ApiServiceEnum;
-use App\Enum\TokenTypeEnum;
 use App\Http\Exceptions\LoginPasswordRequiredException;
 use App\Http\Exceptions\ServiceNotSupportTokenException;
-use App\Http\Exceptions\TokenNotFoundException;
-use App\Repositories\ApiServiceRepository;
+use App\Models\Token;
 use App\Repositories\ApiServiceTokenTypeRepository;
 use App\Repositories\TokenRepository;
 use App\Repositories\TokenTypeRepository;
@@ -22,7 +19,6 @@ readonly class TokenService
 {
     public function __construct(
         private TokenTypeRepository $tokenTypeRepository,
-        private ApiServiceRepository $apiServiceRepository,
         private TokenRepository $tokenRepository,
         private ApiServiceTokenTypeRepository $apiServiceTokenTypeRepository,
     ){
@@ -53,8 +49,8 @@ readonly class TokenService
     private function generateJwt(array $payload): array
     {
         $now = time();
-        $accessExp = $now + 3600;
-        $refreshExp = $now + 3600*24*30;
+        $accessExp = $now + config('jwt.access_exp');
+        $refreshExp = $now + config('jwt.refresh_exp');
 
         $jwtPayload = array_merge([
             'sub' => $payload['account_id'] ?? 0,
@@ -63,7 +59,7 @@ readonly class TokenService
             'nbf' => $now,
         ], $payload);
 
-        $secret = env('JWT_SECRET', 'megasecretkey');
+        $secret = config('jwt.secret');
 
         return [
             'access_token' => JWT::encode($jwtPayload, $secret, 'HS256'),
@@ -84,30 +80,9 @@ readonly class TokenService
 
     /**
      * @throws ServiceNotSupportTokenException
-     * @throws TokenNotFoundException
-     */
-    public function checkToken(string $token, ApiServiceEnum $apiService): bool
-    {
-        $tokenType = $this->detectTokenType($token);
-        $tokenTypeId = $this->tokenTypeRepository->findByType($tokenType);
-        $apiServiceId = $this->apiServiceRepository->findByApiService($apiService);
-
-        if (!$this->apiServiceTokenTypeRepository->exists($tokenTypeId, $apiServiceId)) {
-            throw new ServiceNotSupportTokenException();
-        }
-
-        if (!$this->tokenRepository->checkToken($token, $tokenTypeId, $apiServiceId)) {
-            throw new TokenNotFoundException();
-        }
-
-        return true;
-    }
-
-    /**
-     * @throws ServiceNotSupportTokenException
      * @throws RandomException|LoginPasswordRequiredException
      */
-    public function create(array $data): void
+    public function create(array $data): Token
     {
         if (!$this->apiServiceTokenTypeRepository->exists((int)$data['token_type_id'], (int)$data['api_service_id'])) {
             throw new ServiceNotSupportTokenException();
@@ -131,30 +106,6 @@ readonly class TokenService
             $data['refresh_expires_at'] = null;
         }
 
-        $this->tokenRepository->create($data);
-    }
-
-    public function detectTokenType(string $authorizationHeader): TokenTypeEnum
-    {
-        if (str_starts_with($authorizationHeader, 'Bearer ')) {
-            $token = substr($authorizationHeader, 7);
-            if (substr_count($token, '.') === 2) {
-                return TokenTypeEnum::BEARER;
-            }
-        }
-
-        if (str_starts_with($authorizationHeader, 'Basic ')) {
-            return TokenTypeEnum::LOGIN;
-        }
-
-        if (str_starts_with($authorizationHeader, 'Api-Key ') || str_starts_with($authorizationHeader, 'X-API-Key ')) {
-            return TokenTypeEnum::API_KEY;
-        }
-
-        if (preg_match('/^[a-f0-9\-]{32,}$/i', $authorizationHeader)) {
-            return TokenTypeEnum::API_KEY;
-        }
-
-        throw new InvalidArgumentException('unable_to_detect_token_type');
+        return $this->tokenRepository->create($data);
     }
 }

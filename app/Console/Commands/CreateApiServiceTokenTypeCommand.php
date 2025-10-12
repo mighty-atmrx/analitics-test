@@ -6,10 +6,8 @@ namespace App\Console\Commands;
 
 use App\Http\Exceptions\ApiServiceTokenTypeAlreadyExistsException;
 use App\Repositories\ApiServiceTokenTypeRepository;
-use Illuminate\Console\Command;
-use Symfony\Component\Console\Command\Command as CommandAlias;
 
-class CreateApiServiceTokenTypeCommand extends Command
+class CreateApiServiceTokenTypeCommand extends BaseCreateCommand
 {
     /**
      * The name and signature of the console command.
@@ -33,18 +31,28 @@ class CreateApiServiceTokenTypeCommand extends Command
         parent::__construct();
     }
 
-    /**
-     * Execute the console command.
-     * @throws ApiServiceTokenTypeAlreadyExistsException
-     */
-    public function handle(): int
+    protected function getService(): ApiServiceTokenTypeRepository
     {
-        $apiServiceTokenType = $this->repository->create([
-            'api_service_id' => $this->argument('api_service_id'),
-            'token_type_id' => $this->argument('token_type_id'),
-        ]);
+        return $this->repository;
+    }
 
-        $this->info("Api service token type created");
-        return CommandAlias::SUCCESS;
+    protected function getCreationData(): array
+    {
+        return [
+            'api_service_id' => (int)$this->argument('api_service_id'),
+            'token_type_id' => (int)$this->argument('token_type_id'),
+        ];
+    }
+
+    protected function getEntityType(): string
+    {
+        return 'ApiServiceTokenType';
+    }
+
+    protected function getSpecificExceptions(): array
+    {
+        return [
+            ApiServiceTokenTypeAlreadyExistsException::class
+        ];
     }
 }

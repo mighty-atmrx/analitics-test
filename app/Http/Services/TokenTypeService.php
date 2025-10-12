@@ -4,26 +4,23 @@ declare(strict_types=1);
 
 namespace App\Http\Services;
 
-use App\Dto\TokenTypeDto;
 use App\Http\Exceptions\TokenTypeAlreadyExistsException;
 use App\Repositories\TokenTypeRepository;
 
-readonly class TokenTypeService
+class TokenTypeService extends BaseCreateService
 {
     public function __construct(
-        private TokenTypeRepository $repository
+        private readonly TokenTypeRepository $repository
     ){
     }
 
-    /**
-     * @throws TokenTypeAlreadyExistsException
-     */
-    public function create(array $data): TokenTypeDto
+    protected function getRepository(): TokenTypeRepository
     {
-        if ($this->repository->exists($data)) {
-            throw new TokenTypeAlreadyExistsException();
-        }
+        return $this->repository;
+    }
 
-        return $this->repository->create($data);
+    protected function getExistsExceptionClass(): string
+    {
+        return TokenTypeAlreadyExistsException::class;
     }
 }

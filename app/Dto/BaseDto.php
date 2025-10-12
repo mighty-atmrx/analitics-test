@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Dto;
 
-use App\Enum\SyncEndpointEnum;
+use Illuminate\Database\Eloquent\Model;
 
 interface BaseDto
 {

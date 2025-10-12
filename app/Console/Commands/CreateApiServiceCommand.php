@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Http\Exceptions\ApiServiceAlreadyExistsException;
-use App\Http\Services\ApiServiceService;
-use Illuminate\Console\Command;
-use Symfony\Component\Console\Command\Command as CommandAlias;
+use App\Http\Services\ApiServiceManager;
+use InvalidArgumentException;
 
-class CreateApiServiceCommand extends Command
+class CreateApiServiceCommand extends BaseCreateCommand
 {
     /**
      * The name and signature of the console command.
@@ -28,23 +26,33 @@ class CreateApiServiceCommand extends Command
     protected $description = 'Create new api service';
 
     public function __construct(
-        private readonly ApiServiceService $service
+        private readonly ApiServiceManager $service
     ){
         parent::__construct();
     }
 
-    /**
-     * @throws ApiServiceAlreadyExistsException
-     */
-    public function handle(): int
+    protected function getService(): ApiServiceManager
     {
-        $service = $this->service->create([
-            'name' => $this->argument('name'),
-            'code' => $this->argument('code'),
-        ]);
+        return $this->service;
+    }
 
-        $this->info("Api service was created successfully! ID: {$service->id}, Name: {$service->name}");
+    protected function getCreationData(): array
+    {
+        return [
+            'name' => (string) $this->argument('name'),
+            'code' => (string) $this->argument('code'),
+        ];
+    }
 
-        return CommandAlias::SUCCESS;
+    protected function getEntityType(): string
+    {
+        return 'ApiService';
+    }
+
+    protected function getSpecificExceptions(): array
+    {
+        return [
+            InvalidArgumentException::class
+        ];
     }
 }

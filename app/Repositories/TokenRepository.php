@@ -15,8 +15,8 @@ class TokenRepository
             ->exists();
     }
 
-    public function create(array $data): void
+    public function create(array $data): Token
     {
-        Token::query()->create($data);
+        return Token::query()->create($data);
     }
 }

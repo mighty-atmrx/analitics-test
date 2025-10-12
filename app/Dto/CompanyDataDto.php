@@ -6,7 +6,7 @@ namespace App\Dto;
 
 use App\Models\Company;
 
-class CompanyDto
+class CompanyDataDto
 {
     public function __construct(
         public int $id,

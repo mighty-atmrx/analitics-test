@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Dto;
 
-use App\Enum\SyncEndpointEnum;
+use Carbon\CarbonImmutable;
 use Exception;
+use Illuminate\Support\Carbon;
 
 class SaleDto implements BaseDto
 {
     public function __construct(
+        public int $account_id,
         public string $g_number,
         public string $date,
         public string $last_change_date,
@@ -37,11 +39,13 @@ class SaleDto implements BaseDto
         public string $category,
         public string $brand,
         public ?bool $is_storno,
+        public CarbonImmutable $sync_date
     ){}
 
     public function toArray(): array
     {
         return [
+            'account_id' => $this->account_id,
             'g_number' => $this->g_number,
             'date' => $this->date,
             'last_change_date' => $this->last_change_date,
@@ -69,6 +73,7 @@ class SaleDto implements BaseDto
             'category' => $this->category,
             'brand' => $this->brand,
             'is_storno' => $this->is_storno,
+            'sync_date' => $this->sync_date
         ];
     }
 
@@ -78,6 +83,7 @@ class SaleDto implements BaseDto
     public static function fromArray(array $item): BaseDto
     {
         return new self(
+            account_id: (int) $item['account_id'],
             g_number: (string) ($item['g_number'] ?? ''),
             date: (string) ($item['date'] ?? ''),
             last_change_date: (string) ($item['last_change_date'] ?? ''),
@@ -105,6 +111,7 @@ class SaleDto implements BaseDto
             category: (string) ($item['category'] ?? ''),
             brand: (string) ($item['brand'] ?? ''),
             is_storno: isset($item['is_storno']) ? (bool) $item['is_storno'] : null,
+            sync_date: Carbon::parse($item['sync_date'])->toImmutable()
         );
     }
 }

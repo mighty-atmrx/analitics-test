@@ -31,6 +31,7 @@ return new class extends Migration
             $table->string('brand');
             $table->boolean('is_cancel')->default(false);
             $table->date('cancel_dt')->nullable();
+            $table->date('sync_date');
             $table->timestamps();
 
 

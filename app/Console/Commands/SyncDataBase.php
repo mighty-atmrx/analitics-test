@@ -41,10 +41,11 @@ class SyncDataBase extends Command
 
         $choices = [];
         foreach ($accounts as $index => $account) {
-            $choices[$index] = $account->name;
+            $choices[$index] = 'name: ' . $account->name . '. account_id: ' . $account->id;
         }
 
-        $selectedIndex = (int) $this->choice('Select an account to sync', $choices, 0);
+        $selectedValue = $this->choice('Select an account to sync. Default: ', $choices, 0);
+        $selectedIndex = array_search($selectedValue, $choices, true);
         $account = $accounts[$selectedIndex] ?? null;
 
         if (!$account) {

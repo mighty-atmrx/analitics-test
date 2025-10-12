@@ -6,10 +6,8 @@ namespace App\Console\Commands;
 
 use App\Http\Exceptions\TokenTypeAlreadyExistsException;
 use App\Http\Services\TokenTypeService;
-use Illuminate\Console\Command;
-use Symfony\Component\Console\Command\Command as CommandAlias;
 
-class CreateTokenTypeCommand extends Command
+class CreateTokenTypeCommand extends BaseCreateCommand
 {
     /**
      * The name and signature of the console command.
@@ -33,18 +31,28 @@ class CreateTokenTypeCommand extends Command
         parent::__construct();
     }
 
-    /**
-     * @throws TokenTypeAlreadyExistsException
-     */
-    public function handle(): int
+    protected function getService(): TokenTypeService
     {
-        $tokenType = $this->service->create([
-            'type' => $this->argument('type'),
-            'code' => $this->argument('code'),
-        ]);
+        return $this->service;
+    }
 
-        $this->info("Token type was created successfully! ID: {$tokenType->id}, Type: {$tokenType->type}");
+    protected function getCreationData(): array
+    {
+        return [
+            'type' => (string)$this->argument('type'),
+            'code' => (string)$this->argument('code'),
+        ];
+    }
 
-        return CommandAlias::SUCCESS;
+    protected function getEntityType(): string
+    {
+        return 'TokenType';
+    }
+
+    protected function getSpecificExceptions(): array
+    {
+        return [
+            TokenTypeAlreadyExistsException::class
+        ];
     }
 }

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Dto;
 
-use App\Enum\SyncEndpointEnum;
+use Carbon\CarbonImmutable;
 use Exception;
+use Illuminate\Support\Carbon;
 
 class StockDto implements BaseDto
 {
     public function __construct(
+        public int $account_id,
         public string $date,
         public ?string $last_change_date,
         public ?string $supplier_article,
@@ -29,11 +31,13 @@ class StockDto implements BaseDto
         public ?int $sc_code,
         public ?float $price,
         public ?float $discount,
+        public CarbonImmutable $sync_date
     ){}
 
     public function toArray(): array
     {
         return [
+            'account_id' => $this->account_id,
             'date' => $this->date,
             'last_change_date' => $this->last_change_date,
             'supplier_article' => $this->supplier_article,
@@ -53,6 +57,7 @@ class StockDto implements BaseDto
             'sc_code' => $this->sc_code,
             'price' => $this->price,
             'discount' => $this->discount,
+            'sync_date' => $this->sync_date
         ];
     }
 
@@ -62,6 +67,7 @@ class StockDto implements BaseDto
     public static function fromArray(array $item): BaseDto
     {
         return new self(
+            account_id: (int) $item['account_id'],
             date: (string) ($item['date'] ?? ''),
             last_change_date: isset($item['last_change_date']) ? (string) $item['last_change_date'] : null,
             supplier_article: isset($item['supplier_article']) ? (string) $item['supplier_article'] : null,
@@ -81,6 +87,7 @@ class StockDto implements BaseDto
             sc_code: isset($item['sc_code']) ? (int) $item['sc_code'] : null,
             price: isset($item['price']) ? (float) $item['price'] : null,
             discount: isset($item['discount']) ? (float) $item['discount'] : null,
+            sync_date: Carbon::parse($item['sync_date'])->toImmutable(),
         );
     }
 }
