@@ -5,72 +5,90 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enum\SyncEndpointEnum;
+use App\Http\Exceptions\AccountNotFoundException;
+use App\Http\Services\DebugService;
 use App\Http\Services\SyncService;
 use Exception;
 use Illuminate\Console\Command;
-use Psr\Log\LoggerInterface;
 
 class SyncDataBase extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'sync:data';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Command for import data from wb-api';
 
     public function __construct(
         private readonly SyncService $syncService,
-        private readonly LoggerInterface $logger
+        private readonly DebugService $debugService
     ){
         parent::__construct();
     }
 
     /**
-     * Execute the console command.
-     * @throws Exception
+     * @throws AccountNotFoundException
      */
     public function handle(): void
     {
         set_time_limit(36000);
         ini_set('memory_limit', '512M');
 
-        $this->info("Sync data from wb-api started...");
-        $progressBar = $this->output->createProgressBar(4);
-        $progressBar->setFormat('debug');
-        $progressBar->start();
+        $this->debugService->info("Sync data from wb-api started...");
 
-        try {
-            $this->info("\nSyncing orders...");
-            $this->syncService->sync(SyncEndpointEnum::ORDERS);
-            $progressBar->advance();
-
-            $this->info("\nSyncing sales...");
-            $this->syncService->sync(SyncEndpointEnum::SALES);
-            $progressBar->advance();
-
-            $this->info("\nSyncing incomes...");
-            $this->syncService->sync(SyncEndpointEnum::INCOMES);
-            $progressBar->advance();
-
-            $this->info("\nSyncing stocks...");
-            $this->syncService->sync(SyncEndpointEnum::STOCKS);
-            $progressBar->advance();
-        } catch (Exception $e) {
-            $this->logger->error($e->getMessage());
+        $accounts = $this->syncService->getAccounts();
+        if (empty($accounts)) {
+            $this->error('There are no accounts available for syncing.!');
+            return;
         }
 
+        $choices = [];
+        foreach ($accounts as $index => $account) {
+            $choices[$index] = $account->name;
+        }
 
-        $progressBar->finish();
-        $this->newLine();
+        $selectedIndex = (int) $this->choice('Select an account to sync', $choices, 0);
+        $account = $accounts[$selectedIndex] ?? null;
 
-        $this->info("Sync completed!");
+        if (!$account) {
+            $this->error('Incorrect choice!');
+            return;
+        }
+
+        $this->info("Account selected: {$account->name}");
+
+        $this->syncService->setAccount($account);
+
+        $stages = [
+            SyncEndpointEnum::ORDERS,
+            SyncEndpointEnum::SALES,
+            SyncEndpointEnum::INCOMES,
+            SyncEndpointEnum::STOCKS,
+        ];
+
+        $total = count($stages);
+        $current = 0;
+
+        $this->printProgress($current, $total);
+
+        try {
+            foreach ($stages as $stage) {
+                $current++;
+                $this->debugService->info("\nSyncing {$stage->value}... ({$current}/{$total})");
+
+                $this->syncService->sync($stage);
+
+                $this->printProgress($current, $total);
+            }
+        } catch (Exception $e) {
+            $this->debugService->error("Sync data error: " . $e->getMessage());
+            $this->printProgress($current, $total);
+            return;
+        }
+
+        $this->debugService->info("Sync completed!");
+        $this->printProgress($total, $total);
+    }
+
+    private function printProgress(int $current, int $total): void
+    {
+        echo "- Completed {$current} of {$total} steps\n";
     }
 }

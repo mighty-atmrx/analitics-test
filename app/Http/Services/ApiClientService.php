@@ -8,7 +8,6 @@ use App\Enum\SyncEndpointEnum;
 use Exception;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class ApiClientService
@@ -17,7 +16,7 @@ class ApiClientService
     private string $baseUrl;
 
     public function __construct(
-        private readonly LoggerInterface $logger,
+        private readonly DebugService $debugService,
     ) {
         $this->baseUrl = config('wb.url');
         $this->token = config('wb.key');
@@ -31,7 +30,7 @@ class ApiClientService
         $params['key'] = $this->token;
         $url = "{$this->baseUrl}/api/{$endpoint->value}";
 
-        $this->logger->info("Fetching: {$url}?" . http_build_query($params));
+        $this->debugService->info("Fetching: {$url}?" . http_build_query($params));
 
         try {
             $response = $this->createHttpClient()->get($url, $params);
@@ -40,9 +39,9 @@ class ApiClientService
                 $response = $this->handleTooManyRequests($response, $url, $params);
             }
 
-            $this->logger->info("Response status: " . $response->status());
+            $this->debugService->info("Response status: " . $response->status());
         } catch (Exception $e) {
-            $this->logger->error("Http request failed: " . $e->getMessage());
+            $this->debugService->error("Http request failed: " . $e->getMessage());
             throw new Exception("Http get error: " . $e->getMessage());
         }
 
@@ -88,7 +87,7 @@ class ApiClientService
     private function handleTooManyRequests(\Illuminate\Http\Client\Response $response, string $url, array $params): \Illuminate\Http\Client\Response
     {
         $retryAfter = $response->header('Retry-After') ?? 60;
-        $this->logger->warning("Too many requests, retrying after {$retryAfter} seconds");
+        $this->debugService->warning("Too many requests, retrying after {$retryAfter} seconds");
         sleep($retryAfter);
 
         return $this->createHttpClient()->get($url, $params);
@@ -102,13 +101,13 @@ class ApiClientService
         $decoded = json_decode($response->body(), true, 512, JSON_BIGINT_AS_STRING);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->logger->error("JSON decode error on {$url}: " . json_last_error_msg());
-            $this->logger->error("Raw response: " . $response->body());
+            $this->debugService->error("JSON decode error on {$url}: " . json_last_error_msg());
+            $this->debugService->error("Raw response: " . $response->body());
             throw new Exception("JSON decode error: " . json_last_error_msg());
         }
 
         if (!is_array($decoded)) {
-            $this->logger->error("Unexpected response format: " . $response->body());
+            $this->debugService->error("Unexpected response format: " . $response->body());
             throw new Exception("Unexpected response format from API");
         }
 
@@ -133,7 +132,7 @@ class ApiClientService
 
         do {
             try {
-                $this->logger->info("Fetching page {$page} for {$endpoint->value}");
+                $this->debugService->info("Fetching page {$page} for {$endpoint->value}");
 
                 $response = $this->get($endpoint, [
                     'dateFrom' => $dateParams['from'],
@@ -147,15 +146,15 @@ class ApiClientService
                 $lastPage = $response['meta']['last_page'];
 
                 if ($count === 0) {
-                    $this->logger->info("API returned empty page {$page}, stopping");
+                    $this->debugService->info("API returned empty page {$page}, stopping");
                     break;
                 }
 
                 $all = array_merge($all, $items);
-                $this->logger->info("Loaded page {$page}, items: {$count}, total: " . count($all));
+                $this->debugService->info("Loaded page {$page}, items: {$count}, total: " . count($all));
 
                 if ($page === $lastPage) {
-                    $this->logger->info("Reached last page {$page}" .
+                    $this->debugService->info("Reached last page {$page}" .
                         ($lastPage ? " (of {$lastPage})" : ""));
                     break;
                 }
@@ -166,11 +165,11 @@ class ApiClientService
                 usleep(500_000);
 
             } catch (\Throwable $e) {
-                $this->logger->error("Error fetching page {$page}: " . $e->getMessage());
+                $this->debugService->error("Error fetching page {$page}: " . $e->getMessage());
                 $consecutiveErrors++;
 
                 if ($consecutiveErrors >= $maxConsecutiveErrors) {
-                    $this->logger->error("Too many consecutive errors ({$consecutiveErrors}), stopping");
+                    $this->debugService->error("Too many consecutive errors ({$consecutiveErrors}), stopping");
                     break;
                 }
 
@@ -180,7 +179,7 @@ class ApiClientService
 
         } while ($count === $limit && $page <= $lastPage);
 
-        $this->logger->info("Finished fetching {$endpoint->value}. Total pages: {$page}, total items: " . count($all));
+        $this->debugService->info("Finished fetching {$endpoint->value}. Total pages: {$page}, total items: " . count($all));
         return $all;
     }
 

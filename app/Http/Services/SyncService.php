@@ -4,24 +4,30 @@ declare(strict_types=1);
 
 namespace App\Http\Services;
 
+use App\Dto\AccountDto;
 use App\Dto\BaseDto;
 use App\Enum\SyncEndpointEnum;
 use App\Handlers\BaseHandler;
+use App\Http\Exceptions\AccountNotFoundException;
 use App\Http\Exceptions\DtoNotFoundException;
 use App\Http\Exceptions\HandlerNotFoundException;
+use App\Models\Account;
+use App\Repositories\AccountRepository;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Psr\Log\LoggerInterface;
 
-readonly class SyncService
+class SyncService
 {
+    public Account $account;
+
     /**
      * @param BaseHandler[] $handlers
      */
     public function __construct(
-        private ApiClientService $apiClient,
-        private LoggerInterface $logger,
-        private iterable $handlers,
+        private readonly ApiClientService $apiClient,
+        private readonly DebugService $debugService,
+        private readonly iterable $handlers,
+        private readonly AccountRepository $accountRepository
     ) {
     }
 
@@ -42,11 +48,11 @@ readonly class SyncService
 
         $items = $this->apiClient->fetchData($endpoint);
         if (empty($items)) {
-            $this->logger->warning("SyncService: no items fetched for endpoint={$endpoint->value}");
+            $this->debugService->warning("SyncService: no items fetched for endpoint={$endpoint->value}");
             return;
         }
 
-        $this->logger->info("SyncService: endpoint={$endpoint->value}, fetched " . count($items) . " items total");
+        $this->debugService->info("SyncService: endpoint={$endpoint->value}, fetched " . count($items) . " items total");
 
         $model = $handler->getModelClass();
         if (!class_exists($model)) {
@@ -59,15 +65,15 @@ readonly class SyncService
         $chunks = array_chunk($items, $chunkSize);
 
         foreach ($chunks as $chunkIndex => $chunk) {
-            $this->logger->info("Processing chunk {$chunkIndex} of " . count($chunks) . " for {$endpoint->value}");
+            $this->debugService->info("Processing chunk {$chunkIndex} of " . count($chunks) . " for {$endpoint->value}");
 
             foreach ($chunk as $itemIndex => $item) {
                 try {
                     $dto = $dtoClass::fromArray($item);
                     $model::create($handler->getValues($dto));
                 } catch (\Throwable $e) {
-                    $this->logger->error("Error processing item {$chunkIndex}-{$itemIndex}: " . $e->getMessage());
-                    $this->logger->debug("Problematic item data: " . json_encode($item, JSON_UNESCAPED_UNICODE));
+                    $this->debugService->error("Error processing item {$chunkIndex}-{$itemIndex}: " . $e->getMessage());
+                    $this->debugService->debug("Problematic item data: " . json_encode($item, JSON_UNESCAPED_UNICODE));
                     continue;
                 }
             }
@@ -76,7 +82,7 @@ readonly class SyncService
                 gc_collect_cycles();
             }
 
-            $this->logger->info("Memory usage: " . round(memory_get_usage(true) / 1024 / 1024, 2) . "MB");
+            $this->debugService->info("Memory usage: " . round(memory_get_usage(true) / 1024 / 1024, 2) . "MB");
         }
     }
 
@@ -106,5 +112,23 @@ readonly class SyncService
             SyncEndpointEnum::STOCKS => \App\Dto\StockDto::class,
             default => throw new DtoNotFoundException("Dto not found for endpoint {$endpoint->value}"),
         };
+    }
+
+    public function getAccounts(): array
+    {
+        return $this->accountRepository->all();
+    }
+
+    /**
+     * @throws AccountNotFoundException
+     */
+    public function setAccount(AccountDto $accountDto): void
+    {
+        $account = $this->accountRepository->getById($accountDto->id);
+        if (!$account) {
+            throw new AccountNotFoundException($accountDto->id);
+        }
+
+        $this->account = $account;
     }
 }

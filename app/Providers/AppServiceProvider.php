@@ -14,13 +14,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(\App\Http\Services\SyncService::class, function ($app) {
             return new \App\Http\Services\SyncService(
                 $app->make(\App\Http\Services\ApiClientService::class),
-                $app->make(\Psr\Log\LoggerInterface::class),
+                $app->make(\App\Http\Services\DebugService::class),
                 [
                     $app->make(\App\Handlers\OrderSyncHandler::class),
                     $app->make(\App\Handlers\IncomeSyncHandler::class),
                     $app->make(\App\Handlers\SaleSyncHandler::class),
                     $app->make(\App\Handlers\StockSyncHandler::class),
                 ],
+                $app->make(\App\Repositories\AccountRepository::class)
             );
         });
     }
