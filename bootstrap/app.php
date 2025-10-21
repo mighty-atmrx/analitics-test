@@ -87,5 +87,5 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command(SyncDataBase::class)->dailyAt('08:00');
-        $schedule->command(SyncDataBase::class)->dailyAt('20:00');
+        $schedule->command(SyncDataBase::class)->dailyAt('19:49');
     })->create();

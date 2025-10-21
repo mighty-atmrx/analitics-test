@@ -39,10 +39,41 @@ class SyncDataBase extends Command
             return;
         }
 
-        $choices = [];
-        foreach ($accounts as $index => $account) {
-            $choices[$index] = 'name: ' . $account->name . '. account_id: ' . $account->id;
+        if ($this->isRunningFromCron()) {
+            $this->syncAllAccounts($accounts);
+            return;
         }
+
+        $this->interactiveSync($accounts);
+    }
+
+    private function syncAllAccounts(array $accounts): void
+    {
+        $this->info("Starting sync for all accounts...");
+
+        foreach ($accounts as $account) {
+            $this->info("Syncing account: {$account->name} (ID: {$account->id})");
+
+            try {
+                $this->syncService->setAccount($account);
+                $this->syncStages();
+                $this->info("✓ Account {$account->name} synced successfully");
+            } catch (Exception $e) {
+                $this->error("✗ Failed to sync account {$account->name}: " . $e->getMessage());
+            }
+        }
+
+        $this->info("All accounts sync completed!");
+    }
+
+    /**
+     * @throws AccountNotFoundException
+     */
+    private function interactiveSync(array $accounts): void
+    {
+        $choices = array_map(function ($account) {
+            return 'name: ' . $account->name . '. account_id: ' . $account->id;
+        }, $accounts);
 
         $selectedValue = $this->choice('Select an account to sync. Default: ', $choices, 0);
         $selectedIndex = array_search($selectedValue, $choices, true);
@@ -54,9 +85,12 @@ class SyncDataBase extends Command
         }
 
         $this->info("Account selected: {$account->name}");
-
         $this->syncService->setAccount($account);
+        $this->syncStages();
+    }
 
+    private function syncStages(): void
+    {
         $stages = [
             SyncEndpointEnum::ORDERS,
             SyncEndpointEnum::SALES,
@@ -86,6 +120,11 @@ class SyncDataBase extends Command
 
         $this->debugService->info("Sync completed!");
         $this->printProgress($total, $total);
+    }
+
+    private function isRunningFromCron(): bool
+    {
+        return !$this->input->isInteractive();
     }
 
     private function printProgress(int $current, int $total): void
